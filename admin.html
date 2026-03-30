@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>FILAGAMING Admin - Firebase</title>
+    <style>
+        body { background: #0f0f0f; color: white; font-family: 'Segoe UI', sans-serif; display: flex; margin: 0; height: 100vh; overflow: hidden; }
+        .history-col { width: 300px; background: #161616; border-right: 1px solid #333; display: flex; flex-direction: column; }
+        .main-col { flex: 1; padding: 30px; display: flex; flex-direction: column; align-items: center; overflow-y: auto; }
+        .balance-col { width: 350px; background: #161616; border-left: 1px solid #333; display: flex; flex-direction: column; }
+        .header { padding: 20px; border-bottom: 1px solid #333; text-align: center; background: #1a1a1a; }
+        .header h3 { margin: 0; color: #ffd700; font-size: 14px; text-transform: uppercase; }
+        .content { flex: 1; overflow-y: auto; padding: 15px; }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; width: 100%; max-width: 500px; margin-bottom: 30px; }
+        .stat-card { background: #1e1e1e; padding: 15px; border-radius: 12px; border: 1px solid #333; text-align: center; }
+        .stat-card p { margin: 5px 0 0; font-size: 22px; color: #ffd700; font-weight: bold; }
+        .admin-box { background: #1e1e1e; padding: 25px; border-radius: 15px; border: 1px solid #ffd700; width: 100%; max-width: 400px; }
+        input { width: 90%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #444; background: #2a2a2a; color: white; text-align: center; }
+        button { width: 97%; padding: 14px; background: linear-gradient(180deg, #ffd700, #b8860b); border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .log-item { font-size: 12px; padding: 12px; border-bottom: 1px solid #222; color: #bbb; }
+        .balance-table { width: 100%; border-collapse: collapse; }
+        .balance-table td { padding: 12px 10px; border-bottom: 1px solid #222; }
+        .bal-count { color: #ffd700; font-weight: bold; text-align: right; }
+    </style>
+</head>
+<body>
+
+    <div class="history-col">
+        <div class="header"><h3>Spin History</h3></div>
+        <div class="content" id="history-log"></div>
+    </div>
+
+    <div class="main-col">
+        <h2 style="color:#ffd700;">FILAGAMING ADMIN</h2>
+        <div class="stats-grid">
+            <div class="stat-card"><h4>Daily Tickets</h4><p id="stat-daily">0</p></div>
+            <div class="stat-card"><h4>Active Members</h4><p id="stat-users">0</p></div>
+        </div>
+        <div class="admin-box">
+            <input type="text" id="targetMember" placeholder="Member Name">
+            <input type="number" id="ticketAmt" placeholder="Amount">
+            <button id="btnIssue">ISSUE TICKETS</button>
+        </div>
+    </div>
+
+    <div class="balance-col">
+        <div class="header"><h3>Member Balance</h3></div>
+        <div class="content"><table class="balance-table" id="list"><tbody></tbody></table></div>
+    </div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
+    import { getDatabase, ref, set, onValue, push, runTransaction } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyA5TSVPsEIBJTyqTMICQmkcdaRcGSnwN3Q",
+        authDomain: "komplain-center-c7b44.firebaseapp.com",
+        projectId: "komplain-center-c7b44",
+        storageBucket: "komplain-center-c7b44.firebasestorage.app",
+        messagingSenderId: "246840639153",
+        appId: "1:246840639153:web:5bf1850b19707c5b8e6c90"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // Issue Tickets Function
+    document.getElementById('btnIssue').onclick = () => {
+        const name = document.getElementById('targetMember').value.trim().toLowerCase();
+        const amt = parseInt(document.getElementById('ticketAmt').value) || 0;
+        const today = new Date().toISOString().split('T')[0];
+
+        if(!name || amt <= 0) return;
+
+        runTransaction(ref(db, `members/${name}`), (current) => (current || 0) + amt);
+        runTransaction(ref(db, `stats/${today}`), (current) => (current || 0) + amt);
+
+        document.getElementById('targetMember').value = "";
+        document.getElementById('ticketAmt').value = "";
+    };
+
+    // Live Listeners
+    onValue(ref(db, 'members'), (snapshot) => {
+        const tbody = document.querySelector('#list tbody');
+        tbody.innerHTML = "";
+        let count = 0;
+        snapshot.forEach((child) => {
+            tbody.innerHTML += `<tr><td>${child.key.toUpperCase()}</td><td class="bal-count">${child.val()}</td></tr>`;
+            count++;
+        });
+        document.getElementById('stat-users').innerText = count;
+    });
+
+    onValue(ref(db, 'logs'), (snapshot) => {
+        const logBox = document.getElementById('history-log');
+        logBox.innerHTML = "";
+        const logs = [];
+        snapshot.forEach(child => { logs.push(child.val()); });
+        logs.reverse().slice(0, 20).forEach(entry => {
+            logBox.innerHTML += `<div class="log-item"><small>${entry.time}</small><br><b>${entry.user.toUpperCase()}</b> won ${entry.prize}</div>`;
+        });
+    });
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    onValue(ref(db, `stats/${todayStr}`), (snap) => {
+        document.getElementById('stat-daily').innerText = snap.val() || 0;
+    });
+</script>
+</body>
+</html>

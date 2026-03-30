@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>FILAGAMING - Spin Event</title>
+    <style>
+        body { background: #0f0f0f; color: white; font-family: Arial; text-align: center; margin: 0; }
+        #login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; display: flex; justify-content: center; align-items: center; }
+        .login-box { background: #1e1e1e; padding: 40px; border-radius: 20px; border: 1px solid #ffd700; }
+        input { padding: 12px; margin: 10px 0; border-radius: 8px; width: 200px; text-align: center; }
+        .btn-gold { background: linear-gradient(180deg, #ffd700, #b8860b); border: none; padding: 12px 40px; border-radius: 50px; cursor: pointer; font-weight: bold; }
+        #game-container { position: relative; width: 450px; height: 450px; margin: 20px auto; }
+        .pointer { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 20px solid transparent; border-right: 20px solid transparent; border-top: 45px solid #ff4757; z-index: 10; }
+        #wheel-img { width: 100%; height: 100%; transition: transform 5s cubic-bezier(0.15, 0, 0.15, 1); }
+        #spin-btn { margin-top: 20px; padding: 15px 60px; font-size: 1.5rem; font-weight: 900; background: #444; color: #888; border: none; border-radius: 50px; cursor: not-allowed; }
+        #spin-btn.active { background: linear-gradient(180deg, #ffd700, #b8860b); color: #000; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div id="login-overlay">
+        <div class="login-box">
+            <h2 style="color:#ffd700">MEMBER LOGIN</h2>
+            <input type="text" id="username" placeholder="Username">
+            <button class="btn-gold" id="btnLogin">ENTER</button>
+        </div>
+    </div>
+
+    <h1>FILAGAMING SPIN</h1>
+    <p>User: <span id="display-name">---</span> | Tickets: <span id="ticket-count">0</span></p>
+
+    <div id="game-container">
+        <div class="pointer"></div>
+        <img id="wheel-img" src="wheel1.png">
+    </div>
+
+    <button id="spin-btn">SPIN NOW</button>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
+    import { getDatabase, ref, onValue, set, push, get } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyA5TSVPsEIBJTyqTMICQmkcdaRcGSnwN3Q",
+        authDomain: "komplain-center-c7b44.firebaseapp.com",
+        projectId: "komplain-center-c7b44",
+        storageBucket: "komplain-center-c7b44.firebasestorage.app",
+        messagingSenderId: "246840639153",
+        appId: "1:246840639153:web:5bf1850b19707c5b8e6c90"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    let currentUser = "";
+    let isSpinning = false;
+    const prizes = [
+        { label: "ZONK", angle: -25 },
+        { label: "100,000", angle: 308.57 },
+        { label: "50,000", angle: 257.14 },
+        { label: "25,000", angle: 205.71 },
+        { label: "10,000", angle: 154.28 },
+        { label: "5,000", angle: -125.85 },
+        { label: "2x Free Spin", angle: 51.43 }
+    ];
+
+    document.getElementById('btnLogin').onclick = () => {
+        const name = document.getElementById('username').value.trim().toLowerCase();
+        if(!name) return;
+        currentUser = name;
+        document.getElementById('login-overlay').style.display = 'none';
+        document.getElementById('display-name').innerText = name.toUpperCase();
+        listenToTickets();
+    };
+
+    function listenToTickets() {
+        onValue(ref(db, `members/${currentUser}`), (snapshot) => {
+            const t = snapshot.val() || 0;
+            document.getElementById('ticket-count').innerText = t;
+            const btn = document.getElementById('spin-btn');
+            if(t > 0 && !isSpinning) {
+                btn.classList.add('active');
+                btn.disabled = false;
+            } else {
+                btn.classList.remove('active');
+                btn.disabled = true;
+            }
+        });
+    }
+
+    document.getElementById('spin-btn').onclick = async () => {
+        if(isSpinning) return;
+        const snap = await get(ref(db, `members/${currentUser}`));
+        let tickets = snap.val() || 0;
+        if(tickets <= 0) return;
+
+        isSpinning = true;
+        await set(ref(db, `members/${currentUser}`), tickets - 1);
+
+        const roll = Math.floor(Math.random() * 100);
+        const winner = (roll < 30) ? prizes[5] : prizes[0];
+        const rotation = (360 * 10) + winner.angle;
+        
+        const wheel = document.getElementById('wheel-img');
+        wheel.style.transform = `rotate(${rotation}deg)`;
+
+        setTimeout(() => {
+            push(ref(db, 'logs'), {
+                user: currentUser,
+                prize: winner.label,
+                time: new Date().toLocaleTimeString()
+            });
+            alert("Winner: " + winner.label);
+            isSpinning = false;
+            wheel.style.transition = 'none';
+            wheel.style.transform = `rotate(${winner.angle}deg)`;
+            setTimeout(() => wheel.style.transition = 'transform 5s cubic-bezier(0.15, 0, 0.15, 1)', 50);
+        }, 5200);
+    };
+</script>
+</body>
+</html>
